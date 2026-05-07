@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoAI Integrated Impact View — Côte d'Ivoire</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #0a0f14;
+  --surface: #111820;
+  --surface2: #161f29;
+  --surface3: #1c2a38;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #c8d8e8;
+  --text-dim: #6a8099;
+  --text-bright: #e8f2ff;
+  --accent: #1e90d4;
+  --extreme: #e8433a;
+  --severe: #f07030;
+  --moderate: #e8b020;
+  --minor: #40b870;
+  --watch: #a060d0;
+  --vuln-very-high: #b83030;
+  --vuln-high: #d46828;
+  --vuln-medium: #c89818;
+  --vuln-low: #4898c8;
+  --vuln-very-low: #2870a8;
+  --font-main: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-main); font-size: 12px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border2); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; height: 44px; flex-shrink: 0; z-index: 1000; }
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.logo-badge { background: var(--accent); color: #fff; font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 3px 7px; border-radius: 3px; letter-spacing: 1px; }
+.topbar-title { font-size: 12px; font-weight: 600; color: var(--text-bright); letter-spacing: 0.3px; }
+.topbar-sub { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); }
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.status-pill { display: flex; align-items: center; gap: 5px; background: rgba(232,67,58,0.15); border: 1px solid rgba(232,67,58,0.4); border-radius: 20px; padding: 3px 10px; font-family: var(--font-mono); font-size: 10px; color: #e8433a; font-weight: 600; letter-spacing: 0.5px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #e8433a; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.timestamp { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+
+.layout { display: grid; grid-template-columns: 230px 1fr 340px; flex: 1; overflow: hidden; min-height: 0; }
+.left-panel, .right-panel { background: var(--surface); overflow-y: auto; display: flex; flex-direction: column; }
+.left-panel { border-right: 1px solid var(--border); }
+.right-panel { border-left: 1px solid var(--border); }
+.panel-section { border-bottom: 1px solid var(--border); padding: 12px 14px; }
+.panel-section:last-child { border-bottom: none; }
+.section-label { font-family: var(--font-mono); font-size: 9px; font-weight: 600; color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+
+/* VIGILANCE — FIX #1: official SODEXAM French labels + descriptor */
+.vigilance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.vig-item { border-radius: 4px; padding: 6px 8px; position: relative; overflow: hidden; }
+.vig-item.active::after { content:''; position:absolute; inset:0; border-radius:4px; border:1.5px solid currentColor; pointer-events:none; }
+.vig-item.v-red    { background:rgba(232,67,58,0.15);  color:var(--extreme); }
+.vig-item.v-orange { background:rgba(240,112,48,0.15); color:var(--severe); }
+.vig-item.v-yellow { background:rgba(232,176,32,0.12); color:var(--moderate); }
+.vig-item.v-green  { background:rgba(64,184,112,0.10); color:var(--minor); }
+.vig-name  { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:.5px; }
+.vig-desc  { font-size:8.5px; opacity:0.75; margin-top:1px; line-height:1.3; font-style:italic; }
+.vig-zone  { font-size:10px; margin-top:3px; opacity:.9; }
+.vig-count { font-family:var(--font-mono); font-size:14px; font-weight:600; }
+
+/* DATA SOURCES */
+.data-source { display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); }
+.data-source:last-child { border-bottom:none; }
+.ds-name { font-size:11px; color:var(--text-bright); font-weight:500; }
+.ds-status { display:flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:9px; }
+.ds-dot { width:5px; height:5px; border-radius:50%; }
+.ds-dot.live   { background:#40b870; }
+.ds-dot.static { background:#e8b020; }
+.ds-dot.pilot  { background:#a060d0; }  /* FIX #2: pilot colour */
+.ds-label { color:var(--text-dim); }
+
+/* LAYER TOGGLES */
+.layer-toggle { display:flex; align-items:center; justify-content:space-between; padding:5px 0; }
+.layer-name { font-size:11px; }
+.toggle { width:28px; height:15px; border-radius:8px; position:relative; cursor:pointer; flex-shrink:0; transition:background .2s; }
+.toggle.on  { background:var(--accent); }
+.toggle.off { background:var(--surface3); }
+.toggle::after { content:''; position:absolute; width:11px; height:11px; background:#fff; border-radius:50%; top:2px; transition:left .2s; }
+.toggle.on::after  { left:15px; }
+.toggle.off::after { left:2px; }
+
+/* DSVI LEGEND */
+.vuln-legend { display:flex; flex-direction:column; gap:4px; }
+.vuln-row { display:flex; align-items:center; justify-content:space-between; }
+.vuln-bar-wrap { display:flex; align-items:center; gap:6px; flex:1; }
+.vuln-swatch { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+.vuln-label { font-size:10px; }
+.vuln-pct { font-family:var(--font-mono); font-size:10px; color:var(--text-dim); }
+
+/* MAP */
+.map-area { position:relative; }
+#map { width:100%; height:100%; }
+
+/* MAP TOOLBAR — FIX #9: functional buttons with sub-labels */
+.map-toolbar { position:absolute; top:12px; left:12px; display:flex; gap:6px; z-index:800; }
+.map-btn { background:rgba(17,24,32,0.92); border:1px solid var(--border2); color:var(--text); font-family:var(--font-mono); padding:5px 9px 4px; border-radius:4px; cursor:pointer; backdrop-filter:blur(8px); transition:background .15s, border-color .15s; display:flex; flex-direction:column; align-items:flex-start; gap:1px; }
+.map-btn .btn-title { font-size:10px; font-weight:600; line-height:1; }
+.map-btn .btn-sub   { font-size:8px; color:var(--text-dim); line-height:1; }
+.map-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.map-btn.active .btn-sub { color:rgba(255,255,255,0.65); }
+.map-btn:hover:not(.active) { background:var(--surface3); }
+
+/* MAP SOURCE BADGE — FIX #6: separate timestamps */
+.map-source-badge { position:absolute; bottom:10px; left:10px; z-index:800; font-family:var(--font-mono); font-size:9px; color:rgba(200,220,240,0.4); pointer-events:none; display:flex; flex-direction:column; gap:2px; }
+
+/* VIEW MODE BADGE — FIX #9 */
+.view-mode-badge { position:absolute; top:12px; right:12px; z-index:800; background:rgba(17,24,32,0.88); border:1px solid var(--border2); border-radius:4px; padding:6px 10px; font-family:var(--font-mono); font-size:9px; color:var(--text-dim); backdrop-filter:blur(8px); max-width:210px; line-height:1.5; }
+.view-mode-badge strong { color:var(--text-bright); display:block; margin-bottom:2px; font-size:10px; }
+
+/* LEAFLET */
+.leaflet-tile-pane { filter: brightness(0.88) saturate(0.7); }
+.leaflet-container { background:#0d1822; font-family:var(--font-main); }
+.leaflet-control-zoom { border:1px solid var(--border2) !important; }
+.leaflet-control-zoom a { background:rgba(17,24,32,0.9) !important; color:var(--text) !important; border-color:var(--border2) !important; font-size:14px !important; }
+.leaflet-control-attribution { background:rgba(10,15,20,0.7) !important; color:var(--text-dim) !important; font-size:9px !important; font-family:var(--font-mono) !important; }
+.leaflet-control-attribution a { color:var(--accent) !important; }
+.leaflet-popup-content-wrapper { background:var(--surface); border:1px solid var(--border2); color:var(--text); border-radius:5px; box-shadow:0 4px 20px rgba(0,0,0,0.5); font-family:var(--font-main); }
+.leaflet-popup-tip { background:var(--surface); }
+.popup-title { font-weight:600; color:var(--text-bright); margin-bottom:6px; font-size:12px; }
+.popup-row { display:flex; justify-content:space-between; gap:12px; margin-bottom:3px; font-size:11px; }
+.popup-key { color:var(--text-dim); }
+.popup-val { font-family:var(--font-mono); font-size:10px; }
+/* FIX #7: DSVI category chip in popup */
+.dsvi-chip { font-size:9px; padding:1px 5px; border-radius:2px; margin-left:3px; }
+.dc-very-high { background:rgba(184,48,48,0.25);  color:var(--vuln-very-high); }
+.dc-high      { background:rgba(212,104,40,0.25); color:var(--vuln-high); }
+.dc-medium    { background:rgba(200,152,24,0.25); color:var(--vuln-medium); }
+.dc-low       { background:rgba(72,152,200,0.25); color:var(--vuln-low); }
+.dc-very-low  { background:rgba(40,112,168,0.25); color:var(--vuln-very-low); }
+
+/* RIGHT PANEL */
+.rp-section-label { font-family:var(--font-mono); font-size:9px; font-weight:600; color:var(--text-dim); letter-spacing:1.5px; text-transform:uppercase; padding:10px 14px 4px; }
+
+/* COMPOUND SCORE — FIX #4: component breakdown */
+.gauge-wrap { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--surface2); border-radius:5px; margin:10px 14px 4px; }
+.gauge-track { flex:1; height:8px; background:var(--surface3); border-radius:4px; overflow:hidden; position:relative; }
+.gauge-fill { height:100%; border-radius:4px; background:linear-gradient(to right,var(--minor),var(--moderate),var(--severe),var(--extreme)); }
+.gauge-thumb { position:absolute; right:0; top:-3px; width:2px; height:14px; background:#fff; border-radius:1px; }
+.gauge-label { font-family:var(--font-mono); font-size:10px; color:var(--text-dim); white-space:nowrap; }
+.gauge-val   { font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--severe); white-space:nowrap; }
+.gauge-components { display:flex; gap:5px; padding:0 14px 8px; flex-wrap:wrap; }
+.gauge-comp { font-family:var(--font-mono); font-size:9px; background:var(--surface3); border-radius:2px; padding:2px 6px; color:var(--text-dim); border:1px solid var(--border); }
+.gauge-comp span { color:var(--accent); }
+
+/* STATS */
+.stats-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; padding:10px 14px; }
+.stat-box { background:var(--surface2); border-radius:4px; padding:7px 8px; border:1px solid var(--border); }
+.stat-val   { font-family:var(--font-mono); font-size:15px; font-weight:600; color:var(--text-bright); }
+.stat-unit  { font-family:var(--font-mono); font-size:9px; color:var(--text-dim); }
+.stat-label { font-size:9px; color:var(--text-dim); margin-top:2px; line-height:1.3; }
+
+/* CAP ALERTS */
+.alert-item { padding:11px 14px; border-bottom:1px solid var(--border); position:relative; overflow:hidden; }
+.alert-item::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; }
+.ai-extreme::before { background:var(--extreme); }
+.ai-severe::before  { background:var(--severe); }
+.ai-moderate::before{ background:var(--moderate); }
+.ai-minor::before   { background:var(--minor); }
+.alert-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; gap:6px; }
+.alert-severity { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:.8px; padding:2px 6px; border-radius:2px; white-space:nowrap; flex-shrink:0; }
+.as-extreme  { background:rgba(232,67,58,0.2);  color:var(--extreme); }
+.as-severe   { background:rgba(240,112,48,0.2); color:var(--severe); }
+.as-moderate { background:rgba(232,176,32,0.2); color:var(--moderate); }
+.as-minor    { background:rgba(64,184,112,0.2); color:var(--minor); }
+.alert-time { font-family:var(--font-mono); font-size:9px; color:var(--text-dim); white-space:nowrap; flex-shrink:0; }
+.alert-zone { font-size:12px; font-weight:600; color:var(--text-bright); margin-bottom:4px; line-height:1.3; }
+.alert-body { font-size:11px; color:var(--text-dim); line-height:1.55; margin-bottom:5px; }
+/* FIX #8: CAP tags with hover tooltips */
+.alert-caps { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:5px; }
+.cap-tag { font-family:var(--font-mono); font-size:9px; padding:3px 6px; border-radius:2px; background:var(--surface3); color:var(--text-dim); border:1px solid var(--border2); white-space:nowrap; cursor:help; position:relative; }
+.cap-tag:hover::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 5px); left:0; background:var(--surface2); border:1px solid var(--border2); border-radius:3px; padding:4px 8px; font-size:9px; white-space:normal; color:var(--text); z-index:9000; pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,0.5); min-width:160px; max-width:220px; line-height:1.5; }
+/* FIX #10: zone cross-reference link */
+.alert-zone-link { display:inline-block; font-family:var(--font-mono); font-size:9px; color:var(--accent); cursor:pointer; opacity:0.8; margin-top:2px; }
+.alert-zone-link:hover { opacity:1; text-decoration:underline; }
+
+/* ZONE TABLE — FIX #7: category chips */
+.zone-table { width:100%; border-collapse:collapse; }
+.zone-table th { font-family:var(--font-mono); font-size:9px; color:var(--text-dim); letter-spacing:.8px; text-align:left; padding:5px 14px; border-bottom:1px solid var(--border2); background:var(--surface2); }
+.zone-table td { padding:6px 14px; border-bottom:1px solid var(--border); font-size:10px; vertical-align:middle; }
+.zone-table tr:last-child td { border-bottom:none; }
+.zone-name { font-weight:500; color:var(--text-bright); }
+.dsvi-bar-wrap { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.dsvi-bar { height:5px; border-radius:2px; min-width:4px; }
+.dsvi-val { font-family:var(--font-mono); font-size:9px; color:var(--text-dim); }
+.dsvi-band-chip { font-family:var(--font-mono); font-size:8px; padding:1px 4px; border-radius:2px; }
+.impact-badge { font-family:var(--font-mono); font-size:9px; padding:2px 5px; border-radius:2px; display:inline-block; }
+.ib-extreme  { background:rgba(232,67,58,0.2);  color:var(--extreme); }
+.ib-severe   { background:rgba(240,112,48,0.2); color:var(--severe); }
+.ib-moderate { background:rgba(232,176,32,0.2); color:var(--moderate); }
+.ib-minor    { background:rgba(64,184,112,0.2); color:var(--minor); }
+.ib-watch    { background:rgba(160,96,208,0.2); color:var(--watch); }
+/* FIX #10: row highlight for cross-reference */
+.zone-table tr.z-highlighted td { background:rgba(30,144,212,0.1); transition:background 0.3s; }
+
+/* DISSEMINATION — FIX #5: Lôr Bouôr as Phase 3 out of scope */
+.diss-item { display:flex; align-items:center; justify-content:space-between; padding:6px 14px; border-bottom:1px solid var(--border); }
+.diss-name { font-size:10px; display:flex; align-items:center; gap:5px; flex:1; }
+.diss-icon { font-size:11px; }
+.diss-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+.diss-status { font-family:var(--font-mono); font-size:9px; padding:2px 5px; border-radius:2px; flex-shrink:0; }
+.ds-sent    { background:rgba(64,184,112,0.15); color:var(--minor); }
+.ds-pending { background:rgba(232,176,32,0.15); color:var(--moderate); }
+.ds-outscope { background:rgba(106,128,153,0.08); color:rgba(106,128,153,0.5); font-style:italic; }
+.diss-scope { font-family:var(--font-mono); font-size:8px; color:rgba(106,128,153,0.5); }
+
+/* VALIDATION — FIX #3 & #11: timestamps, elapsed time, logical consistency */
+.val-item { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); }
+.val-item:last-child { border-bottom:none; }
+.val-name { font-size:11px; color:var(--text-bright); font-weight:500; }
+.val-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+.val-timestamp { font-family:var(--font-mono); font-size:8px; color:var(--text-dim); }
+.val-elapsed   { font-family:var(--font-mono); font-size:8px; color:var(--moderate); }
+
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--surface3); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="logo-badge">UNDP</span>
+    <span class="topbar-title">Vue d'Impact Intégrée</span>
+    <span class="topbar-sub">Système GeoAI Adaptation Climatique — Côte d'Ivoire · Pilote Phase 1</span>
+  </div>
+  <div class="topbar-right">
+    <div class="status-pill"><div class="status-dot"></div>ÉVÉNEMENT INONDATION ACTIF</div>
+    <span class="timestamp">05 MAI 2026 · 14:32 UTC</span>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- FIX #1: official SODEXAM vigilance scale in French -->
+    <div class="panel-section">
+      <div class="section-label">Vigilance SODEXAM — Active</div>
+      <div class="vigilance-grid">
+        <div class="vig-item v-red active">
+          <div class="vig-name">ROUGE</div>
+          <div class="vig-desc">Soyez très vigilant</div>
+          <div class="vig-zone">Abidjan Sud</div>
+          <div class="vig-count">3</div>
+        </div>
+        <div class="vig-item v-orange active">
+          <div class="vig-name">ORANGE</div>
+          <div class="vig-desc">Soyez vigilant</div>
+          <div class="vig-zone">Abidjan Nord</div>
+          <div class="vig-count">4</div>
+        </div>
+        <div class="vig-item v-yellow">
+          <div class="vig-name">JAUNE</div>
+          <div class="vig-desc">Soyez attentif</div>
+          <div class="vig-zone">Périphérie</div>
+          <div class="vig-count">5</div>
+        </div>
+        <div class="vig-item v-green">
+          <div class="vig-name">VERT</div>
+          <div class="vig-desc">Pas d'alerte</div>
+          <div class="vig-zone">Autres zones</div>
+          <div class="vig-count">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FIX #2: DSVI as pilot, FIX #6: separate timestamps -->
+    <div class="panel-section">
+      <div class="section-label">Sources de données</div>
+      <div class="data-source">
+        <div class="ds-name">SODEXAM Prévisions</div>
+        <div class="ds-status"><div class="ds-dot live"></div><span class="ds-label">LIVE · 13:00 UTC</span></div>
+      </div>
+      <div class="data-source">
+        <div class="ds-name">UNOSAT FloodAI</div>
+        <div class="ds-status"><div class="ds-dot live"></div><span class="ds-label">LIVE · 06:14 UTC</span></div>
+      </div>
+      <div class="data-source">
+        <div class="ds-name">DSVI — Grand Abidjan</div>
+        <div class="ds-status"><div class="ds-dot pilot"></div><span class="ds-label" style="color:#a060d0;">PILOTE Phase&nbsp;1</span></div>
+      </div>
+    </div>
+
+    <!-- FIX #9: toggles wired to map layer functions -->
+    <div class="panel-section">
+      <div class="section-label">Couches cartographiques</div>
+      <div class="layer-toggle"><span class="layer-name">Étendue inondation (UNOSAT)</span><div class="toggle on" id="tog-flood" onclick="toggleLayer('flood',this)"></div></div>
+      <div class="layer-toggle"><span class="layer-name">Vulnérabilité DSVI</span><div class="toggle on" id="tog-dsvi" onclick="toggleLayer('dsvi',this)"></div></div>
+      <div class="layer-toggle"><span class="layer-name">Score impact composé</span><div class="toggle on" id="tog-impact" onclick="toggleLayer('impact',this)"></div></div>
+      <div class="layer-toggle"><span class="layer-name">Vigilance SODEXAM</span><div class="toggle on" id="tog-vig" onclick="toggleLayer('vig',this)"></div></div>
+      <div class="layer-toggle"><span class="layer-name">Infrastructures</span><div class="toggle off" id="tog-infra" onclick="toggleLayer('infra',this)"></div></div>
+      <div class="layer-toggle"><span class="layer-name">Densité population</span><div class="toggle off" id="tog-pop" onclick="toggleLayer('pop',this)"></div></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">Légende DSVI — Vulnérabilité sociale</div>
+      <div class="vuln-legend">
+        <div class="vuln-row"><div class="vuln-bar-wrap"><div class="vuln-swatch" style="background:var(--vuln-very-high)"></div><span class="vuln-label">Très élevée</span></div><span class="vuln-pct">18 %</span></div>
+        <div class="vuln-row"><div class="vuln-bar-wrap"><div class="vuln-swatch" style="background:var(--vuln-high)"></div><span class="vuln-label">Élevée</span></div><span class="vuln-pct">24 %</span></div>
+        <div class="vuln-row"><div class="vuln-bar-wrap"><div class="vuln-swatch" style="background:var(--vuln-medium)"></div><span class="vuln-label">Moyenne</span></div><span class="vuln-pct">31 %</span></div>
+        <div class="vuln-row"><div class="vuln-bar-wrap"><div class="vuln-swatch" style="background:var(--vuln-low)"></div><span class="vuln-label">Faible</span></div><span class="vuln-pct">19 %</span></div>
+        <div class="vuln-row"><div class="vuln-bar-wrap"><div class="vuln-swatch" style="background:var(--vuln-very-low)"></div><span class="vuln-label">Très faible</span></div><span class="vuln-pct">8 %</span></div>
+      </div>
+    </div>
+
+    <!-- FIX #3 & #11: human-in-the-loop validation; timestamps; consistent authorisation logic -->
+    <div class="panel-section">
+      <div class="section-label">Validation (Human-in-the-loop)</div>
+      <div class="val-item">
+        <div class="val-name">Expertise météo</div>
+        <div class="val-right">
+          <div class="ds-status"><div class="ds-dot live"></div><span class="ds-label">CONFIRMÉ</span></div>
+          <div class="val-timestamp">14:05 UTC</div>
+        </div>
+      </div>
+      <div class="val-item">
+        <!-- FIX #3: Civil Protection still pending; FIX #11: elapsed time shown -->
+        <div class="val-name">Protection Civile</div>
+        <div class="val-right">
+          <div class="ds-status"><div class="ds-dot static"></div><span class="ds-label">EN ATTENTE</span></div>
+          <div class="val-elapsed">↻ 27 min · depuis 14:05 UTC</div>
+        </div>
+      </div>
+      <div class="val-item">
+        <!-- FIX #3: Alert NOT authorised while Civil Protection is pending -->
+        <div class="val-name">Alerte autorisée</div>
+        <div class="val-right">
+          <div class="ds-status"><div class="ds-dot static"></div><span class="ds-label" style="color:var(--moderate);">EN ATTENTE PC</span></div>
+          <div class="val-timestamp" style="color:rgba(232,176,32,0.6);">Requiert confirmation PC</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MAP AREA -->
+  <div class="map-area">
+    <!-- FIX #9: functional toolbar buttons with sub-labels -->
+    <div class="map-toolbar">
+      <div class="map-btn active" id="btn-impact" onclick="setMapView('impact')">
+        <span class="btn-title">Vue Impact</span>
+        <span class="btn-sub">DSVI + Aléa + Score</span>
+      </div>
+      <div class="map-btn" id="btn-hazard" onclick="setMapView('hazard')">
+        <span class="btn-title">Aléa</span>
+        <span class="btn-sub">SODEXAM + UNOSAT</span>
+      </div>
+      <div class="map-btn" id="btn-vuln" onclick="setMapView('vuln')">
+        <span class="btn-title">Vulnérabilité</span>
+        <span class="btn-sub">DSVI uniquement</span>
+      </div>
+      <div class="map-btn" id="btn-satellite" onclick="setMapView('satellite')">
+        <span class="btn-title">Satellite</span>
+        <span class="btn-sub">Fond ortho</span>
+      </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- FIX #9: view-mode description badge -->
+    <div class="view-mode-badge" id="view-desc">
+      <strong>Vue Impact composé</strong>
+      Zones colorées par DSVI × aléa. Bleu = étendue Sentinel-1. Cercles = vigilance SODEXAM.
+    </div>
+
+    <!-- FIX #6: separate source timestamps for SODEXAM and UNOSAT -->
+    <div class="map-source-badge">
+      <span>📡 UNOSAT FloodAI · Sentinel-1 · 05 MAI 06:14 UTC</span>
+      <span>🌦 SODEXAM · Prévision émise: 05 MAI 13:00 UTC</span>
+      <span style="opacity:0.5;">© OpenStreetMap · © CARTO · © Esri</span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <!-- FIX #4: compound score with three-component breakdown -->
+    <div class="rp-section-label" style="padding-top:12px;">Score d'impact composé — Grand Abidjan</div>
+    <div class="gauge-wrap">
+      <span class="gauge-label">SCORE</span>
+      <div class="gauge-track">
+        <div class="gauge-fill" style="width:72%;position:relative;"><div class="gauge-thumb"></div></div>
+      </div>
+      <span class="gauge-val">72 / 100</span>
+    </div>
+    <div class="gauge-components">
+      <div class="gauge-comp">Vigilance SODEXAM: <span>ROUGE</span></div>
+      <div class="gauge-comp">Étendue UNOSAT: <span>34 km²</span></div>
+      <div class="gauge-comp">DSVI moyen: <span>0.57</span></div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">342<span class="stat-unit">k</span></div><div class="stat-label">Pop. en zone inondée</div></div>
+      <div class="stat-box"><div class="stat-val">18<span class="stat-unit">%</span></div><div class="stat-label">Vulnérabilité très élevée</div></div>
+      <div class="stat-box"><div class="stat-val">34<span class="stat-unit">km²</span></div><div class="stat-label">Étendue inondation</div></div>
+    </div>
+
+    <!-- FIX #8, #10, #12: CAP alerts with tooltips, zone links, corrected urgency levels -->
+    <div class="rp-section-label">Alertes CAP — Actives (4)</div>
+
+    <div class="alert-item ai-extreme">
+      <div class="alert-header">
+        <span class="alert-severity as-extreme">EXTRÊME</span>
+        <span class="alert-time">14:18 UTC</span>
+      </div>
+      <div class="alert-zone">Adjamé — Communes 1 &amp; 2</div>
+      <div class="alert-body">Inondation éclair imminente. DSVI 0.84 — vulnérabilité très élevée. Évacuation des zones basses recommandée.</div>
+      <div class="alert-caps">
+        <span class="cap-tag" data-tip="IMMÉDIATE: action requise immédiatement pour protéger vies et biens">Urgence: IMMÉDIATE</span>
+        <span class="cap-tag" data-tip="EXTRÊME: menace extraordinaire pour la vie ou les biens">Sévérité: EXTRÊME</span>
+        <span class="cap-tag" data-tip="OBSERVÉE: l'événement a été directement observé par UNOSAT/SODEXAM">Certitude: OBSERVÉE</span>
+      </div>
+      <!-- FIX #10: cross-reference to zone priority table -->
+      <a class="alert-zone-link" onclick="highlightZone('Adjamé')">↓ Voir Adjamé dans le tableau de priorité</a>
+    </div>
+
+    <div class="alert-item ai-severe">
+      <div class="alert-header">
+        <span class="alert-severity as-severe">GRAVE</span>
+        <span class="alert-time">13:55 UTC</span>
+      </div>
+      <div class="alert-zone">Abobo — Secteurs Nord</div>
+      <div class="alert-body">Inondation active. DSVI 0.71 — vulnérabilité élevée. Risque infrastructurel élevé. Protection civile déployée.</div>
+      <div class="alert-caps">
+        <!-- FIX #12: corrected from IMMEDIATE to EXPECTED — lower DSVI than Adjamé, different impact profile -->
+        <span class="cap-tag" data-tip="ATTENDUE: action réactive requise dans un délai proche — impact inférieur à Adjamé (DSVI 0.71 vs 0.84)">Urgence: ATTENDUE</span>
+        <span class="cap-tag" data-tip="GRAVE: menace significative pour la vie ou les biens">Sévérité: GRAVE</span>
+        <span class="cap-tag" data-tip="PROBABLE: probabilité de survenance supérieure à 50%">Certitude: PROBABLE</span>
+      </div>
+      <a class="alert-zone-link" onclick="highlightZone('Abobo')">↓ Voir Abobo dans le tableau de priorité</a>
+    </div>
+
+    <div class="alert-item ai-severe">
+      <div class="alert-header">
+        <span class="alert-severity as-severe">GRAVE</span>
+        <span class="alert-time">14:02 UTC</span>
+      </div>
+      <div class="alert-zone">Koumassi — Zone Industrielle</div>
+      <div class="alert-body">Étendue inondation en expansion vers le sud. DSVI 0.68. Alerte diffusée CI-Alerte et radio.</div>
+      <div class="alert-caps">
+        <span class="cap-tag" data-tip="ATTENDUE: action requise dans un délai proche">Urgence: ATTENDUE</span>
+        <span class="cap-tag" data-tip="GRAVE: menace significative pour la vie ou les biens">Sévérité: GRAVE</span>
+        <span class="cap-tag" data-tip="PROBABLE: probabilité de survenance supérieure à 50%">Certitude: PROBABLE</span>
+      </div>
+      <a class="alert-zone-link" onclick="highlightZone('Koumassi')">↓ Voir Koumassi dans le tableau de priorité</a>
+    </div>
+
+    <div class="alert-item ai-moderate">
+      <div class="alert-header">
+        <span class="alert-severity as-moderate">MODÉRÉE</span>
+        <span class="alert-time">13:40 UTC</span>
+      </div>
+      <div class="alert-zone">Yopougon — Secteurs Ouest</div>
+      <div class="alert-body">Inondations localisées. DSVI 0.52 — vulnérabilité moyenne. Surveillance maintenue. Aucun ordre d'évacuation.</div>
+      <div class="alert-caps">
+        <span class="cap-tag" data-tip="ATTENDUE: action requise dans un futur proche">Urgence: ATTENDUE</span>
+        <span class="cap-tag" data-tip="MODÉRÉE: menace possible pour la vie ou les biens">Sévérité: MODÉRÉE</span>
+        <span class="cap-tag" data-tip="POSSIBLE: probabilité d'occurrence d'environ 50%">Certitude: POSSIBLE</span>
+      </div>
+      <a class="alert-zone-link" onclick="highlightZone('Yopougon')">↓ Voir Yopougon dans le tableau de priorité</a>
+    </div>
+
+    <!-- FIX #7 & #13: zone table with DSVI band chips; Attécoubé corrected to SURVEILLANCE -->
+    <div class="rp-section-label">Priorité de réponse — Résumé zones</div>
+    <table class="zone-table" id="zone-priority-table">
+      <thead><tr><th>ZONE</th><th>DSVI</th><th>IMPACT</th></tr></thead>
+      <tbody>
+        <tr data-zone="Adjamé">
+          <td class="zone-name">Adjamé</td>
+          <td><div class="dsvi-bar-wrap"><div class="dsvi-bar" style="width:42px;background:var(--vuln-very-high)"></div><span class="dsvi-val">0.84</span><span class="dsvi-band-chip dc-very-high">Très élevée</span></div></td>
+          <td><span class="impact-badge ib-extreme">EXTRÊME</span></td>
+        </tr>
+        <tr data-zone="Abobo">
+          <td class="zone-name">Abobo</td>
+          <td><div class="dsvi-bar-wrap"><div class="dsvi-bar" style="width:35px;background:var(--vuln-high)"></div><span class="dsvi-val">0.71</span><span class="dsvi-band-chip dc-high">Élevée</span></div></td>
+          <td><span class="impact-badge ib-severe">GRAVE</span></td>
+        </tr>
+        <tr data-zone="Koumassi">
+          <td class="zone-name">Koumassi</td>
+          <td><div class="dsvi-bar-wrap"><div class="dsvi-bar" style="width:34px;background:var(--vuln-high)"></div><span class="dsvi-val">0.68</span><span class="dsvi-band-chip dc-high">Élevée</span></div></td>
+          <td><span class="impact-badge ib-severe">GRAVE</span></td>
+        </tr>
+        <tr data-zone="Yopougon">
+          <td class="zone-name">Yopougon</td>
+          <td><div class="dsvi-bar-wrap"><div class="dsvi-bar" style="width:26px;background:var(--vuln-medium)"></div><span class="dsvi-val">0.52</span><span class="dsvi-band-chip dc-medium">Moyenne</span></div></td>
+          <td><span class="impact-badge ib-moderate">MODÉRÉE</span></td>
+        </tr>
+        <!-- FIX #13: Attécoubé not flooded → cannot be SEVERE; set to SURVEILLANCE -->
+        <tr data-zone="Attécoubé">
+          <td class="zone-name">Attécoubé</td>
+          <td><div class="dsvi-bar-wrap"><div class="dsvi-bar" style="width:30px;background:var(--vuln-high)"></div><span class="dsvi-val">0.60</span><span class="dsvi-band-chip dc-high">Élevée</span></div></td>
+          <td><span class="impact-badge ib-watch">SURVEILLANCE</span></td>
+        </tr>
+        <tr data-zone="Port-Bouët">
+          <td class="zone-name">Port-Bouët</td>
+          <td><div class="dsvi-bar-wrap"><div class="dsvi-bar" style="width:22px;background:var(--vuln-medium)"></div><span class="dsvi-val">0.44</span><span class="dsvi-band-chip dc-medium">Moyenne</span></div></td>
+          <td><span class="impact-badge ib-moderate">MODÉRÉE</span></td>
+        </tr>
+        <tr data-zone="Plateau">
+          <td class="zone-name">Plateau</td>
+          <td><div class="dsvi-bar-wrap"><div class="dsvi-bar" style="width:10px;background:var(--vuln-very-low)"></div><span class="dsvi-val">0.19</span><span class="dsvi-band-chip dc-very-low">Très faible</span></div></td>
+          <td><span class="impact-badge ib-minor">MINEURE</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- FIX #5: Lôr Bouôr shown as Phase 3, out of scope for Phase 1 -->
+    <div class="rp-section-label">Diffusion alertes — CI-Alerte</div>
+    <div class="diss-item">
+      <div class="diss-name"><span class="diss-icon">📡</span>CI-Alerte (Cell Broadcast)</div>
+      <div class="diss-right"><span class="diss-status ds-sent">ENVOYÉ</span><span class="diss-scope">14:20 UTC</span></div>
+    </div>
+    <div class="diss-item">
+      <div class="diss-name"><span class="diss-icon">📻</span>RTI Radio / Fréquence 2</div>
+      <div class="diss-right"><span class="diss-status ds-sent">ENVOYÉ</span><span class="diss-scope">14:22 UTC</span></div>
+    </div>
+    <div class="diss-item">
+      <div class="diss-name"><span class="diss-icon">🏛</span>Réseaux municipaux</div>
+      <div class="diss-right"><span class="diss-status ds-pending">EN COURS</span><span class="diss-scope">depuis 14:18 UTC</span></div>
+    </div>
+    <!-- FIX #5: Phase 3 label, greyed out -->
+    <div class="diss-item" style="opacity:0.45;">
+      <div class="diss-name"><span class="diss-icon">📱</span>Lôr Bouôr (SMS rural) <span style="font-size:9px;color:var(--text-dim);">— hors périmètre Phase 1</span></div>
+      <div class="diss-right"><span class="diss-status ds-outscope">PHASE 3</span><span class="diss-scope">Extension rurale prévue</span></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ── Map init ──
+const map = L.map('map', { center:[5.345,-4.010], zoom:12, zoomControl:true, attributionControl:true });
+
+// Tile layers
+const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution:'© OpenStreetMap © CARTO', subdomains:'abcd', maxZoom:19
+});
+const satTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution:'© Esri World Imagery', maxZoom:19
+});
+darkTile.addTo(map);
+let currentTile = 'dark';
+
+// ── Municipality data ──
+// FIX #13: Attécoubé → SURVEILLANCE (not flooded, cannot be SEVERE)
+// FIX #14: Yopougon & Koumassi flood flags reconciled with polygon coverage
+const municipalities = [
+  { name:'Abobo',      dsvi:0.71, band:'Élevée',     bandCls:'dc-high',      impact:'GRAVE',       flooded:true,  pop:'~870k',
+    coords:[[5.420,-4.085],[5.445,-4.055],[5.460,-4.025],[5.455,-4.000],[5.440,-3.990],[5.420,-3.985],[5.405,-3.990],[5.395,-4.005],[5.385,-4.020],[5.385,-4.045],[5.395,-4.065],[5.408,-4.078]],
+    fillColor:'#d46828', fillOpacity:0.45 },
+  { name:'Anyama',     dsvi:0.38, band:'Faible',      bandCls:'dc-low',       impact:'MINEURE',     flooded:false, pop:'~120k',
+    coords:[[5.480,-4.060],[5.500,-4.030],[5.510,-4.010],[5.505,-3.990],[5.490,-3.985],[5.470,-3.990],[5.455,-4.000],[5.460,-4.025],[5.445,-4.055]],
+    fillColor:'#4898c8', fillOpacity:0.30 },
+  { name:'Yopougon',   dsvi:0.52, band:'Moyenne',     bandCls:'dc-medium',    impact:'MODÉRÉE',
+    // FIX #14: Yopougon polygon does not overlap main flood extent — set flooded:false
+    flooded:false, pop:'~1.1M',
+    coords:[[5.330,-4.105],[5.355,-4.110],[5.375,-4.105],[5.390,-4.090],[5.395,-4.065],[5.385,-4.045],[5.385,-4.020],[5.370,-4.010],[5.355,-4.015],[5.335,-4.030],[5.320,-4.055],[5.315,-4.080]],
+    fillColor:'#c89818', fillOpacity:0.38 },
+  { name:'Attécoubé',  dsvi:0.60, band:'Élevée',      bandCls:'dc-high',
+    // FIX #13: no active flooding → SURVEILLANCE, not SEVERE
+    impact:'SURVEILLANCE', flooded:false, pop:'~250k',
+    coords:[[5.355,-4.015],[5.370,-4.010],[5.385,-4.020],[5.395,-4.005],[5.395,-3.990],[5.380,-3.978],[5.362,-3.975],[5.348,-3.982],[5.340,-3.997],[5.340,-4.010]],
+    fillColor:'#7030a0', fillOpacity:0.28 },
+  { name:'Adjamé',     dsvi:0.84, band:'Très élevée', bandCls:'dc-very-high', impact:'EXTRÊME',     flooded:true,  pop:'~380k',
+    coords:[[5.362,-4.010],[5.375,-4.005],[5.385,-3.995],[5.388,-3.980],[5.378,-3.968],[5.362,-3.962],[5.348,-3.968],[5.340,-3.980],[5.338,-3.995],[5.348,-4.007]],
+    fillColor:'#b83030', fillOpacity:0.60 },
+  { name:'Cocody',     dsvi:0.22, band:'Très faible',  bandCls:'dc-very-low',  impact:'MINEURE',    flooded:false, pop:'~450k',
+    coords:[[5.388,-3.980],[5.395,-3.990],[5.405,-3.990],[5.420,-3.985],[5.425,-3.965],[5.415,-3.940],[5.395,-3.930],[5.370,-3.935],[5.355,-3.945],[5.348,-3.960],[5.362,-3.962],[5.378,-3.968]],
+    fillColor:'#2870a8', fillOpacity:0.28 },
+  { name:'Bingerville', dsvi:0.18, band:'Très faible', bandCls:'dc-very-low',  impact:'MINEURE',    flooded:false, pop:'~90k',
+    coords:[[5.370,-3.935],[5.395,-3.930],[5.415,-3.940],[5.425,-3.920],[5.415,-3.895],[5.395,-3.888],[5.372,-3.892],[5.358,-3.908],[5.358,-3.925]],
+    fillColor:'#2870a8', fillOpacity:0.22 },
+  { name:'Plateau',    dsvi:0.19, band:'Très faible',  bandCls:'dc-very-low',  impact:'MINEURE',    flooded:false, pop:'~10k',
+    coords:[[5.348,-4.007],[5.340,-3.997],[5.333,-3.992],[5.325,-3.998],[5.325,-4.010],[5.333,-4.018],[5.343,-4.018]],
+    fillColor:'#2870a8', fillOpacity:0.32 },
+  { name:'Treichville', dsvi:0.55, band:'Moyenne',    bandCls:'dc-medium',     impact:'MODÉRÉE',    flooded:false, pop:'~100k',
+    coords:[[5.313,-4.020],[5.325,-4.010],[5.325,-3.998],[5.315,-3.990],[5.303,-3.992],[5.298,-4.003],[5.302,-4.015]],
+    fillColor:'#c89818', fillOpacity:0.38 },
+  { name:'Marcory',    dsvi:0.44, band:'Moyenne',     bandCls:'dc-medium',     impact:'MODÉRÉE',    flooded:false, pop:'~200k',
+    coords:[[5.325,-3.998],[5.333,-3.992],[5.340,-3.997],[5.348,-3.982],[5.340,-3.972],[5.325,-3.968],[5.310,-3.970],[5.300,-3.980],[5.302,-3.992],[5.315,-3.990]],
+    fillColor:'#c89818', fillOpacity:0.30 },
+  { name:'Koumassi',   dsvi:0.68, band:'Élevée',      bandCls:'dc-high',       impact:'GRAVE',
+    // FIX #14: Koumassi has its own separate flood patch — keep flooded:true but align polygon
+    flooded:true, pop:'~420k',
+    coords:[[5.325,-3.968],[5.340,-3.972],[5.348,-3.960],[5.355,-3.945],[5.345,-3.932],[5.328,-3.928],[5.310,-3.935],[5.300,-3.950],[5.300,-3.965],[5.310,-3.970]],
+    fillColor:'#d46828', fillOpacity:0.50 },
+  { name:'Port-Bouët', dsvi:0.44, band:'Moyenne',     bandCls:'dc-medium',     impact:'MODÉRÉE',    flooded:false, pop:'~360k',
+    coords:[[5.298,-4.003],[5.302,-3.992],[5.300,-3.980],[5.300,-3.965],[5.300,-3.950],[5.285,-3.945],[5.265,-3.948],[5.255,-3.962],[5.258,-3.980],[5.268,-3.995],[5.280,-4.005]],
+    fillColor:'#c89818', fillOpacity:0.32 }
+];
+
+// ── DSVI colour by score ──
+function dsviColor(v) {
+  if (v>=0.75) return '#b83030';
+  if (v>=0.55) return '#d46828';
+  if (v>=0.35) return '#c89818';
+  if (v>=0.20) return '#4898c8';
+  return '#2870a8';
+}
+const impactColors = { 'EXTRÊME':'#e8433a','GRAVE':'#f07030','MODÉRÉE':'#e8b020','MINEURE':'#40b870','SURVEILLANCE':'#a060d0' };
+const impactBgs    = { 'EXTRÊME':'rgba(232,67,58,0.2)','GRAVE':'rgba(240,112,48,0.2)','MODÉRÉE':'rgba(232,176,32,0.2)','MINEURE':'rgba(64,184,112,0.2)','SURVEILLANCE':'rgba(160,96,208,0.2)' };
+
+// ── Layer groups ──
+const lg = {
+  impact: L.layerGroup(),
+  dsvi:   L.layerGroup(),
+  flood:  L.layerGroup(),
+  vig:    L.layerGroup(),
+  infra:  L.layerGroup(),
+  pop:    L.layerGroup(),
+  labels: L.layerGroup()
+};
+
+// ── Lagoon (permanent) ──
+L.polygon([[5.315,-4.110],[5.330,-4.105],[5.355,-4.110],[5.375,-4.105],[5.390,-4.090],[5.395,-4.065],[5.370,-4.048],[5.340,-4.040],[5.320,-4.055],[5.315,-4.080]],
+  { color:'#0d4a70',weight:0,fillColor:'#0d2030',fillOpacity:0.65 }).addTo(map);
+L.marker([5.348,-4.070],{icon:L.divIcon({className:'',html:'<div style="font-family:IBM Plex Mono,monospace;font-size:9px;font-style:italic;color:rgba(30,144,212,0.6);text-shadow:0 1px 2px rgba(0,0,0,0.8);white-space:nowrap;">Lagune Ebrié</div>',iconAnchor:[35,5]})}).addTo(map);
+
+// ── FIX #14: Main flood extent — Adjamé + Abobo only ──
+const floodMain = L.polygon([
+  [5.408,-4.040],[5.425,-4.022],[5.430,-4.003],[5.422,-3.987],
+  [5.408,-3.980],[5.392,-3.982],[5.378,-3.968],[5.362,-3.962],
+  [5.345,-3.970],[5.338,-3.985],[5.340,-4.000],[5.352,-4.012],
+  [5.368,-4.018],[5.385,-4.022],[5.395,-4.035]
+], { color:'#1e90d4',weight:1.5,dashArray:'5,3',fillColor:'#1e90d4',fillOpacity:0.18 });
+floodMain.bindTooltip('<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:#1e90d4;">UNOSAT FloodAI<br>Sentinel-1 · 06:14 UTC<br>Étendue: ~28 km²<br>Zones: Adjamé + Abobo</div>',{sticky:true});
+lg.flood.addLayer(floodMain);
+
+// FIX #14: Koumassi has separate smaller flood zone aligned with its polygon ──
+const floodKoumassi = L.polygon([
+  [5.348,-3.960],[5.355,-3.945],[5.345,-3.932],[5.335,-3.935],[5.320,-3.942],[5.318,-3.955],[5.328,-3.962]
+], { color:'#1e90d4',weight:1,dashArray:'4,3',fillColor:'#1e90d4',fillOpacity:0.15 });
+floodKoumassi.bindTooltip('<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:#1e90d4;">UNOSAT FloodAI<br>Koumassi — zone partielle<br>~6 km²</div>',{sticky:true});
+lg.flood.addLayer(floodKoumassi);
+
+// ── SODEXAM vigilance circles ──
+[
+  {latlng:[5.375,-4.002],color:'#e8433a',label:'ROUGE',  radius:900},
+  {latlng:[5.420,-4.035],color:'#f07030',label:'ORANGE', radius:1200},
+  {latlng:[5.355,-4.055],color:'#f07030',label:'ORANGE', radius:800}
+].forEach(v => {
+  const c = L.circle(v.latlng,{radius:v.radius,color:v.color,weight:1.5,fillColor:v.color,fillOpacity:0.10,dashArray:'4,3'});
+  c.bindTooltip(`<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:${v.color};">SODEXAM<br>Vigilance ${v.label}</div>`,{sticky:true});
+  lg.vig.addLayer(c);
+});
+
+// ── Municipality polygons ──
+municipalities.forEach(m => {
+  // Impact view polygon
+  const impPoly = L.polygon(m.coords,{color:m.fillColor,weight:1.2,fillColor:m.fillColor,fillOpacity:m.fillOpacity});
+  impPoly.bindPopup(`
+    <div class="popup-title">${m.name}</div>
+    <div class="popup-row"><span class="popup-key">Score DSVI</span><span class="popup-val">${m.dsvi} <span class="dsvi-chip ${m.bandCls}">${m.band}</span></span></div>
+    <div class="popup-row"><span class="popup-key">Niveau d'impact</span><span class="popup-val" style="background:${impactBgs[m.impact]||''};color:${impactColors[m.impact]||'#c8d8e8'};padding:1px 5px;border-radius:2px;">${m.impact}</span></div>
+    <div class="popup-row"><span class="popup-key">Inondation active</span><span class="popup-val" style="color:${m.flooded?'#1e90d4':'#6a8099'}">${m.flooded?'OUI':'NON'}</span></div>
+    <div class="popup-row"><span class="popup-key">Population</span><span class="popup-val">${m.pop}</span></div>
+  `,{maxWidth:230});
+  lg.impact.addLayer(impPoly);
+
+  // DSVI-only polygon (vulnerability view)
+  const dColor = dsviColor(m.dsvi);
+  const dsviPoly = L.polygon(m.coords,{color:dColor,weight:1.2,fillColor:dColor,fillOpacity:0.52});
+  dsviPoly.bindPopup(`
+    <div class="popup-title">${m.name} — Vulnérabilité DSVI</div>
+    <div class="popup-row"><span class="popup-key">Score DSVI</span><span class="popup-val">${m.dsvi} — ${m.band}</span></div>
+    <div class="popup-row"><span class="popup-key">Population</span><span class="popup-val">${m.pop}</span></div>
+  `,{maxWidth:200});
+  lg.dsvi.addLayer(dsviPoly);
+
+  // Zone label
+  const center = L.polygon(m.coords).getBounds().getCenter();
+  lg.labels.addLayer(L.marker(center,{icon:L.divIcon({className:'',
+    html:`<div style="font-family:IBM Plex Mono,monospace;font-size:9px;font-weight:600;color:rgba(232,245,255,0.75);text-shadow:0 1px 3px rgba(0,0,0,0.9);white-space:nowrap;text-align:center;pointer-events:none;">${m.name}</div>`,
+    iconAnchor:[30,6]})}));
+});
+
+// ── Infrastructure layer (placeholder) ──
+[{latlng:[5.375,-4.002],label:'CHU Cocody',icon:'🏥'},{latlng:[5.352,-4.012],label:'CHU Adjamé',icon:'🏥'},{latlng:[5.342,-3.998],label:'Marché Adjamé',icon:'🏪'}]
+.forEach(p => {
+  const mk = L.marker(p.latlng,{icon:L.divIcon({className:'',html:`<div style="font-size:14px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.8));">${p.icon}</div>`,iconAnchor:[8,8]})});
+  mk.bindTooltip(`<div style="font-family:IBM Plex Mono,monospace;font-size:10px;">${p.label}</div>`,{sticky:true});
+  lg.infra.addLayer(mk);
+});
+
+// ── Population density circles (placeholder) ──
+municipalities.forEach(m => {
+  const num = parseInt(m.pop.replace(/[^0-9.kKmM]/g,''))*( m.pop.includes('M')?1000:m.pop.includes('k')?1:1) || 100;
+  const center = L.polygon(m.coords).getBounds().getCenter();
+  const c = L.circle(center,{radius:Math.sqrt(num)*20,color:'rgba(180,210,255,0.4)',weight:0.5,fillColor:'rgba(180,210,255,0.04)',fillOpacity:1});
+  c.bindTooltip(`<div style="font-family:IBM Plex Mono,monospace;font-size:10px;">${m.name}: ${m.pop}</div>`,{sticky:true});
+  lg.pop.addLayer(c);
+});
+
+// ── Activate default layers ──
+lg.impact.addTo(map); lg.flood.addTo(map); lg.vig.addTo(map); lg.labels.addTo(map);
+
+// ── FIX #9: View mode switching ──
+const viewMeta = {
+  impact:    {title:'Vue Impact composé',  desc:'Zones colorées par DSVI × aléa. Bleu = étendue Sentinel-1. Cercles tiretés = vigilance SODEXAM.'},
+  hazard:    {title:'Vue Aléa',            desc:'Étendue inondation UNOSAT (bleu) + vigilance SODEXAM. Communes désactivées.'},
+  vuln:      {title:'Vue Vulnérabilité DSVI', desc:'Zones colorées par score DSVI uniquement. Rouge = très élevée, bleu foncé = très faible.'},
+  satellite: {title:'Vue Satellite',       desc:'Fond Esri World Imagery. Toutes les couches analytiques actives.'}
+};
+
+let tileFilter = 'brightness(0.88) saturate(0.7)';
+
+function setMapView(view) {
+  ['impact','hazard','vuln','satellite'].forEach(v => document.getElementById('btn-'+v).classList.toggle('active', v===view));
+  const d = viewMeta[view];
+  document.getElementById('view-desc').innerHTML = `<strong>${d.title}</strong>${d.desc}`;
+
+  // Tile switch
+  if (view==='satellite' && currentTile!=='sat') {
+    map.removeLayer(darkTile); satTile.addTo(map); currentTile='sat';
+    document.querySelector('.leaflet-tile-pane').style.filter='brightness(1) saturate(1)';
+  } else if (view!=='satellite' && currentTile!=='dark') {
+    map.removeLayer(satTile); darkTile.addTo(map); currentTile='dark';
+    document.querySelector('.leaflet-tile-pane').style.filter=tileFilter;
+  }
+
+  // Layer config per view
+  const show = (g) => { if (!map.hasLayer(g)) map.addLayer(g); };
+  const hide = (g) => { if (map.hasLayer(g)) map.removeLayer(g); };
+  const sync = (id, on) => { const el=document.getElementById(id); if(el){el.classList.toggle('on',on);el.classList.toggle('off',!on);} };
+
+  if (view==='impact') {
+    show(lg.impact); hide(lg.dsvi); show(lg.flood); show(lg.vig); show(lg.labels);
+    sync('tog-impact',true); sync('tog-dsvi',false); sync('tog-flood',true); sync('tog-vig',true);
+  } else if (view==='hazard') {
+    hide(lg.impact); hide(lg.dsvi); show(lg.flood); show(lg.vig); show(lg.labels);
+    sync('tog-impact',false); sync('tog-dsvi',false); sync('tog-flood',true); sync('tog-vig',true);
+  } else if (view==='vuln') {
+    hide(lg.impact); show(lg.dsvi); hide(lg.flood); show(lg.vig); show(lg.labels);
+    sync('tog-impact',false); sync('tog-dsvi',true); sync('tog-flood',false); sync('tog-vig',true);
+  } else if (view==='satellite') {
+    show(lg.impact); hide(lg.dsvi); show(lg.flood); show(lg.vig); show(lg.labels);
+    sync('tog-impact',true); sync('tog-dsvi',false); sync('tog-flood',true); sync('tog-vig',true);
+  }
+}
+
+// ── Left panel toggle handler ──
+function toggleLayer(key, el) {
+  const on = el.classList.contains('off');
+  el.classList.toggle('on',on); el.classList.toggle('off',!on);
+  const g = {flood:lg.flood,dsvi:lg.dsvi,impact:lg.impact,vig:lg.vig,infra:lg.infra,pop:lg.pop}[key];
+  if (!g) return;
+  if (on) { if(!map.hasLayer(g)) map.addLayer(g); } else { if(map.hasLayer(g)) map.removeLayer(g); }
+}
+
+// ── FIX #10: Cross-reference zone highlight ──
+function highlightZone(name) {
+  const tbody = document.querySelector('#zone-priority-table tbody');
+  tbody.querySelectorAll('tr').forEach(tr => tr.classList.remove('z-highlighted'));
+  let target = null;
+  tbody.querySelectorAll('tr').forEach(tr => { if(tr.getAttribute('data-zone')===name) target=tr; });
+  if (target) {
+    target.classList.add('z-highlighted');
+    const rp = document.querySelector('.right-panel');
+    const table = document.getElementById('zone-priority-table');
+    rp.scrollTo({ top: table.offsetTop - 60, behavior:'smooth' });
+    setTimeout(() => target.classList.remove('z-highlighted'), 3000);
+  }
+}
+</script>
+</body>
+</html>
