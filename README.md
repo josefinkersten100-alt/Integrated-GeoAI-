@@ -1,12 +1,12 @@
-<!-- README.md -->
-## My Embedded HTML Demo  
- 
-Check out this interactive HTML content:  
- 
-<iframe 
-  src="[https://josefinkersten100-alt.github.io/Integrated-GeoAI-/]" 
-  width="100%" 
-  height="400px" 
-  title="Embedded HTML Demo" 
-  sandbox="allow-scripts"  <!-- Allows the embedded HTML to run scripts -->
-></iframe>
+# Integrated GeoAI Demo
+
+🚀 **Live Demo:**  
+👉 https://josefinkersten100-alt.github.io/Integrated-GeoAI-/
+
+---
+
+## Preview
+
+Click below to open the interactive version:
+
+[![Open Demo](https://img.shields.io/badge/Open-Demo-blue?style=for-the-badge)](https://josefinkersten100-alt.github.io/Integrated-GeoAI-/)
