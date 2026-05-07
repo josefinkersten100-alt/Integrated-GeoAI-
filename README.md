@@ -4,7 +4,7 @@
 Check out this interactive HTML content:  
  
 <iframe 
-  src="[https://<your-username>.github.io/html-demos/demo.html](https://josefinkersten100-alt.github.io/Integrated-GeoAI-/)" 
+  src="[https://josefinkersten100-alt.github.io/Integrated-GeoAI-/]" 
   width="100%" 
   height="400px" 
   title="Embedded HTML Demo" 
